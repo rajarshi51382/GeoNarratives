@@ -1,0 +1,116 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{colm2025_conference}
+
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\definecolor{darkblue}{rgb}{0, 0, 0.5}
+\hypersetup{colorlinks=true, citecolor=darkblue, linkcolor=darkblue, urlcolor=darkblue}
+
+\title{GeoSentiment: Probing Geographic Bias in Language Models via Counterfactual Prompting}
+
+\author{Anonymous Authors\\Submission under review}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Understanding geographic bias in language models is critical for assessing their fairness in news reporting and global discourse. We introduce \textbf{GeoSentiment}, a system that probes location-specific sentiment bias using a novel counterfactual prompting framework. Our method constructs a structured dataset of 32,250 headlines by substituting 645 diverse geographic locations into 50 sentiment-sensitive headline templates. Each headline is aligned with a category label and template ID, enabling fine-grained traceability and analysis. While evaluations are ongoing, we outline a planned methodology for applying sentiment analysis models to compare sentiment distributions across geographic substitutions. This approach aims to uncover whether and how model sentiment shifts based solely on the mentioned location, shedding light on implicit geographic stereotypes in language model behavior. Our system provides a foundation for scalable and interpretable bias auditing in NLP pipelines.
+\end{abstract}
+
+\section{Introduction}
+Geographic references play a crucial role in framing information in news and media. However, language models may learn and reflect implicit biases toward specific locations, potentially leading to skewed sentiment predictions or reinforcing harmful stereotypes. Unlike demographic or gender-based biases, geographic bias remains underexplored. We propose \textit{GeoSentiment}, a system that detects such bias by observing how sentiment predictions vary when only the location name in a headline is changed, holding all other linguistic context constant. Our goal is to establish a robust, scalable framework for identifying geographic sentiment bias in language models.
+
+\section{Related Work}
+
+\subsection{Geographic Knowledge and Bias in LLMs}
+Large language models encode unequal representations of geographic regions. \citet{manvi2024geographically} find that LLMs rate lower-income countries more negatively across subjective attributes, while \citet{moayeri2024worldbench} show that factual recall performance declines for underrepresented regions using WorldBench. \citet{decoupes2024distortions} examine spatial embeddings and uncover significant semantic distortions in how LLMs represent place names. \citet{bhagat2025richer} reinforce these concerns in generative tasks, showing that outputs for low-income countries contain less specificity and more negativity in travel and story generation. However, prior work has not evaluated geographic disparities in affective language within news-like contexts, which frequently shape public perception. Our work fills this gap by testing whether models produce different sentiment when the location in a headline is changed while holding all else constant.
+
+\subsection{Multilingual and Cultural Bias}
+Multilingual models also show uneven behavior across linguistic and cultural settings. \citet{goldfarb2023bias} construct counterfactual sentence pairs and demonstrate that non-English sentiment models exhibit more bias than English ones. \citet{yu2025msqad} introduce the MSQAD benchmark and find that responses to the same ethical questions vary significantly across languages, even within the same model. These results suggest that cultural encoding in language models varies across languages and can shape sentiment predictions. Yet, existing work has not connected this multilingual variation to geographic framing, even though many locations are strongly associated with cultural or linguistic stereotypes. GeoSentiment addresses this issue by enabling controlled testing of how sentiment shifts with location changes, independent of language.
+
+\subsection{Counterfactual Methods for Bias Detection}
+Researchers increasingly use counterfactual evaluation to uncover hidden model biases. \citet{goldfarb2023bias} and \citet{huang2020reducing} apply minimally altered input pairs to reveal sentiment shifts, introducing fairness metrics such as sentiment deviation and Wasserstein distance. \citet{huang2020reducing} also propose mitigation strategies like counterfactual data augmentation and representation regularization. \citet{lu2018gender} show that contrastive augmentation improves fairness in gender-related tasks. These methods perform well in sentiment classification and persona generation. However, counterfactual approaches have not been used to systematically investigate geographic sentiment bias. GeoSentiment builds on this work by replacing only the location in templated headlines to isolate and quantify how place names influence sentiment, expanding the scope of counterfactual fairness evaluation.
+\section{Methodology}
+
+Our goal is to assess whether large language models exhibit geographic sentiment bias, or in other words, whether sentiment predictions change when only the location in a sentence varies. To do this, we construct a counterfactual evaluation framework, generate a structured headline dataset, and plan comparative sentiment analysis across locations.
+
+\subsection{Headline Template Construction}
+We manually author 50 headline templates, each containing a \texttt{\{location\}} placeholder. These templates are designed to evoke sentiment through plausible, emotionally salient scenarios—e.g., “Protests erupt in \texttt{\{location\}} after election results” or “Major earthquake hits \texttt{\{location\}}.” Each template is grammatically stable across location substitutions and reflects common news story structures. To enable structured analysis, every template is assigned a unique Template ID and labeled with one of eight predefined categories: \textit{General}, \textit{Politics}, \textit{Business}, \textit{Science}, \textit{Health}, \textit{Sports}, \textit{Entertainment}, and \textit{Technology}.
+
+
+\subsection{Geographic Location Metadata}
+
+To generate a globally representative and metadata-rich set of locations, we developed a pipeline that aggregates, filters, and annotates location data from multiple APIs.
+
+We first queried the World Bank API to retrieve all sovereign countries along with their ISO3 codes, income levels, and UN-defined regions. We filtered out aggregate and non-classified entries, resulting in a list of 195 countries. To obtain ISO2 codes (required by GeoNames), we matched ISO3 to ISO2 via the GeoNames \texttt{countryInfoJSON} endpoint.
+
+For each country, we queried the GeoNames API to extract its top 3 most populous cities, ordered by population. This yielded approximately 645 major cities from 215 countries. We collected structured metadata using the GeoNames \texttt{searchJSON} endpoint, including:
+\begin{itemize}
+  \item \textbf{Name:} Canonical English name.
+  \item \textbf{Country:} Country containing the city.
+  \item \textbf{Region:} First-order administrative division (admin1).
+  \item \textbf{Population:} Reported population from GeoNames.
+  \item \textbf{Coordinates:} Latitude and longitude.
+  \item \textbf{Timezone:} GeoNames-inferred local time zone.
+\end{itemize}
+
+We used the original World Bank income level to assign a simplified binary \textbf{Development Level} label (\textit{developed} vs. \textit{developing}). We also inferred a \textbf{Cultural Familiarity} tag based on region groupings: locations in North America, Western Europe, or Oceania were labeled \textit{Familiar to Western}; all others were labeled \textit{Unfamiliar to Western}.
+
+To enrich each location’s semantic context, we used the Python \texttt{wikipedia} library to fetch a short summary (3 sentences) via disambiguated queries (e.g., “Nairobi, Kenya”). In cases of disambiguation or errors, we fell back to a simpler city-only query. These summaries were stored for possible use in interpretability and post-hoc qualitative analysis.
+
+The final dataset includes 645 locations, each annotated with structured metadata: country, region, development level, population, cultural familiarity, and Wikipedia summary. This design supports correlation, clustering, and subgroup analysis in our evaluation of geographic sentiment bias.
+
+\subsection{Dataset Creation}
+We fully expand the dataset by applying every location to every headline template. This results in $50 \times 645 = 32{,}250$ unique headline instances. Each instance is labeled with:
+\begin{itemize}
+  \item The headline text (e.g., “Protests erupt in Nairobi after election results”).  
+  \item Template ID and Category label.  
+  \item Location metadata.  
+\end{itemize}
+We ensure there are no malformed headlines or duplicates. Each block of 645 headlines (one per location) corresponds to a single template, enabling within-template comparisons.
+
+\subsection{Sentiment Evaluation Pipeline}
+Each headline is passed through one or more pretrained sentiment analysis models. We plan to use:
+\begin{itemize}
+  \item \textbf{VADER:} A rule-based sentiment classifier optimized for short text.  
+  \item \textbf{DistilBERT and RoBERTa-based models:} Fine-tuned on sentiment tasks such as SST-2 or TweetEval.  
+\end{itemize}
+Each model outputs a sentiment score or class (e.g., positive/neutral/negative or a scalar in $[-1, 1]$). We store all model predictions along with the headline metadata.
+
+\subsection{Bias Detection Strategy}
+To detect geographic sentiment bias, we focus on the following analyses:
+\begin{itemize}
+  \item \textbf{Intra-template variance:} For each template, we compute the distribution of sentiment scores across all 645 locations. Significant variance suggests the model’s sentiment depends on location.  
+  \item \textbf{Group comparisons:} We group locations by metadata (e.g., developed vs. developing, region) and test for distributional shifts using ANOVA and Kruskal-Wallis tests.  
+  \item \textbf{Correlation analysis:} We compute Pearson and Spearman correlations between sentiment scores and location-level attributes (e.g., population, development level).  
+  \item \textbf{Outlier analysis:} We identify locations whose sentiment scores deviate substantially from the template median. These may signal strong bias or unusual associations.  
+\end{itemize}
+
+\subsection{Traceability and Interpretability}
+Each headline instance is traceable to a specific template and location. This structure supports fine-grained error analysis and visualization. For example, we can map sentiment scores onto a world map or cluster locations by their sentiment profiles using dimensionality reduction.
+
+\subsection{Model Robustness Checks}
+To ensure findings are not artifacts of a single sentiment classifier, we will repeat evaluations across models. We will also compare results when using continuous vs. categorical sentiment outputs and when normalizing scores across templates.
+
+
+\section{Experimental Setup}
+Although full evaluations are pending, we outline our experimental design as follows:
+\begin{itemize}
+  \item \textbf{Sentiment Models:} We will apply multiple sentiment classifiers (e.g., VADER, DistilBERT, RoBERTa-based sentiment models) to ensure robustness across model types.
+  \item \textbf{Metrics:} For each template, we will compute the mean and variance of sentiment scores across locations. We will use ANOVA and Kruskal-Wallis tests to detect significant differences.
+  \item \textbf{Correlation Analysis:} We will compute Pearson and Spearman correlations between sentiment scores and location metadata features.
+  \item \textbf{Bias Visualization:} We aim to visualize sentiment variance across global maps, cluster locations by model behavior, and identify outliers.
+\end{itemize}
+
+\section*{Ethics Statement}
+This work raises important questions about fairness and representation in language technologies. While our dataset includes real-world locations, we do not assign sentiment labels ourselves; all sentiment scores are model-generated. We emphasize that geographic bias is a model artifact and should not be interpreted as reflecting actual attributes of places.
+
+\bibliographystyle{colm2024_conference}
+\bibliography{colm2024_conference}
+
+\end{document}
+
+
